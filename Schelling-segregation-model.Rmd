@@ -1,0 +1,262 @@
+---
+title: "Schelling Segregation model"
+author: "Tori LeVier"
+date: "2023-08-31"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Model Overview
+
+### Purpose
+
+Determine whether segregation can be explained by individual motivations to avoid being a local minority. Agents will move around a two-dimensional space depending on whether they are a racial minority within their local neighborhood.
+ 
+### Agents
+
+A population of agents will be generated; each agent will have a race (black or white) and a position in a 2-dimensional space.
+ 
+### Life Cycle
+ 
+1. Assess
+2. Move
+ 
+#### Assess
+
+Each agent will first calculate how far they are from each other agent in the 2D space. The agent will then identify all agents who reside within a set radius around them. These agents constitute the focal agent's neighborhood.
+
+The focal agent will then determine the race of all agents in their neighborhood. Finally, the agent will determine whether they are in the minority race in their neighborhood.
+
+#### Move
+
+In this stage of the life cycle, the agent makes one decision: if the agent is not in the minority then they will stay where they are. If the agent is in the minority, they will move to a new random location.
+ 
+### Analysis
+
+The model will plot the position of agents before and after the movement phases
+
+## Model
+
+### Packages
+
+```{r packages}
+
+library(ggplot2)
+
+```
+
+### Parameters
+
+```{r parameters}
+#Can play around and change some of the values below, such as changing the radius to be much smaller which would result in smaller neighborhoods
+
+#Population sizes
+#The number of agents to generate
+popsize <- 1000
+
+#Neighborhood radius
+#How close an agent must be to be a neighbor
+radius <- 20
+
+#Minority threshold
+#The proportion of same-race neighbors below which an agent will decide to move
+threshold <- .5
+
+#Maximum steps
+#Maximum number of movement cycles agents will go through
+maxsteps <- 100
+
+#Current steps
+#Create a variable to track completed movement cycles
+steps <- 0
+
+```
+
+### Functions
+```{r functions}
+
+agentGenerate <- function(n){
+  
+  # Assign each agent a random race
+  race <- sample(c("black","white"),n,replace=T)
+  
+  #Random uniform distribution (similar to rolling dice)
+  #n, min val, max val
+  #Assign each agent a random x-position
+  xpos <- runif(n,0,100)
+  
+  #Assign each agent a random y-position
+  ypos <- runif(n,0,100)
+  
+  #Generate the agents
+  agents <- data.frame(race,xpos,ypos)
+  
+  #Output the agents
+  return(agents)
+}
+
+
+
+#Assess#
+#Have the agents assess their neighborhood and decide whether they want to move
+assess <- function(agents,radius,threshold){
+  
+  #Computes the straight line distance between each agent and all other agents
+  distances <- as.matrix(dist(agents[,2:3]))
+  
+  #Create a blank vector to store agent movement decisions
+  movedecision <- rep(NA,nrow(agents))
+  
+  for(a in 1:nrow(agents)){
+    
+    #Determine which agents are each agent's neighbors
+    neighbors <- distances[a,] <= radius
+    
+    #Determine which agents are of the same race as the focal agent
+    samerace <- agents$race[a] == agents$race
+    
+    #Have the agent determine the number of neighbors who are of the same race
+    assessment <- sum(samerace & neighbors)/sum(neighbors)
+    
+    #Have the agent decide whether or not to move
+    movedecision[a] <- assessment < threshold
+    
+  }
+  
+  #Output the agents' movement decisions
+  return(movedecision)
+  
+}
+
+
+#Move#
+#A function to have agents move
+move <- function(agents,movedecision){
+  
+  #Loop one by one through agents
+  for(a in 1:nrow(agents)){
+    
+    #If the agent decided to move...
+    if(movedecision[a] == T){
+      
+      #Assign them a new random x and y position
+      agents$xpos[a] <- runif(1,0,100)
+      agents$ypos[a] <- runif(1,0,100)
+    }
+    
+  }
+  
+  #Output the agents with their (potential) new positions
+  return(agents)  
+}
+
+
+```
+
+
+### Life Cycle
+
+```{r lifeCycle}
+
+#Generate the agents
+agents <- agentGenerate(popsize)
+
+#Save the starting state of the agents dataframe
+startagents <- agents
+
+while(maxsteps > steps){
+  #Increment steps by 1
+  steps <- steps + 1
+  
+  #Assess#
+
+  #Have the agents assess their neighborhood and decide whether to move
+  movedecision <- assess(agents, radius, threshold)
+  
+  #Move#
+  
+  #Have the agents move if they are dissatisfied with their current neighborhood
+  agents <- move(agents,movedecision)
+  
+  #If no one wants to move...
+  if(sum(movedecision) == 0){
+    #End the loop
+    break
+  }
+  
+}
+
+#Save the state of the agents' dataframe after agents move
+endagents <- agents
+
+
+```
+
+### Analysis
+
+```{r analysis}
+
+#Plot agents' starting positions
+t1plot <- ggplot(data=startagents,
+                 aes(x=xpos, y=ypos, color = race)) +
+  labs(x = "", y="",color = "Agent Race")+
+  geom_point(size = 2.5)+
+  scale_color_manual(values=c("black","white"),
+                     labels=c("Black","White"))+
+  theme(panel.background=element_rect(fill="grey"))
+
+
+#Plot agents' finishing positions
+t2plot <- ggplot(data=endagents,
+                 aes(x=xpos, y=ypos, color = race)) +
+  labs(x = "", y="",color = "Agent Race")+
+  geom_point(size = 2.5)+
+  scale_color_manual(values=c("black","white"),
+                     labels=c("Black","White"))+
+  theme(panel.background=element_rect(fill="grey"))
+
+```
+
+
+Consistent with expectations, agents are initially not highly segregated:
+```{r t1plot}
+
+t1plot
+
+```
+
+
+However, after agents are allowed to move in accordance with their motivations, highly segregated neighborhoods do appear:
+```{r t2plot}
+
+t2plot
+
+```
+
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
